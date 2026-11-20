@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { type CellState, FLAG, OPEN, QUESTION, type Field } from '../mines/board';
 import type { Hint } from '../mines/hints';
 
@@ -18,6 +18,42 @@ interface Props {
 
 /** 길게 누르면 반대 동작(깃발) */
 const LONG_PRESS_MS = 380;
+/** 판 테두리(양쪽 합) */
+const BORDER = 4;
+/** .app의 최대 폭과 좌우 여백 합 (styles.css와 같게) */
+const APP_MAX = 520;
+const APP_PAD = 32;
+
+/**
+ * 판 폭에 맞는 칸 크기. 화면 실제 픽셀(devicePixelRatio) 단위의 정수로 맞춰
+ * 모든 칸과 간격이 같은 픽셀 수로 그려지게 한다.
+ */
+function useCellSize(w: number) {
+  const [size, setSize] = useState<{ cell: number; gap: number } | null>(null);
+  useLayoutEffect(() => {
+    const calc = () => {
+      // 판을 감싼 칸의 폭은 판 자신 때문에 늘어날 수 있어, 화면 폭에서 앱 여백을 빼서 쓴다
+      const avail = Math.min(document.documentElement.clientWidth, APP_MAX) - APP_PAD;
+      const dpr = window.devicePixelRatio || 1;
+      const gapDev = Math.max(1, Math.round(dpr));
+      const availDev = Math.floor((avail - BORDER) * dpr) - gapDev * (w + 1);
+      const cellDev = Math.floor(availDev / w);
+      if (cellDev <= 0) return;
+      const next = { cell: cellDev / dpr, gap: gapDev / dpr };
+      setSize((prev) => (prev && prev.cell === next.cell && prev.gap === next.gap ? prev : next));
+    };
+    calc();
+    window.addEventListener('resize', calc);
+    // 화면 회전·창 크기 변화를 놓치지 않게 문서 폭 변화도 본다
+    const ro = new ResizeObserver(calc);
+    ro.observe(document.documentElement);
+    return () => {
+      window.removeEventListener('resize', calc);
+      ro.disconnect();
+    };
+  }, [w]);
+  return size;
+}
 
 export function MineBoard({ field, state, cursor, reveal, hint, hintLevel, onPrimary, onSecondary }: Props) {
   const { w, h, num, mine } = field;
@@ -50,15 +86,16 @@ export function MineBoard({ field, state, cursor, reveal, hint, hintLevel, onPri
     press.current = null;
   };
 
+  const size = useCellSize(w);
+  // 칸·간격을 화면 픽셀에 딱 맞는 크기로 둔다. 판 폭을 칸 수로 나눈 소수점 크기를 쓰면
+  // 휴대폰이 칸마다 다르게 반올림해 칸 크기가 제각각으로 보였다(중급 16칸 등)
+  const grid = size
+    ? { gridTemplateColumns: `repeat(${w}, ${size.cell}px)`, gridTemplateRows: `repeat(${h}, ${size.cell}px)`, gap: `${size.gap}px`, padding: `${size.gap}px` }
+    : { gridTemplateColumns: `repeat(${w}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${h}, minmax(0, 1fr))`, aspectRatio: `${w} / ${h}`, width: '100%' };
+
   return (
-    <div
-      className="mine-board"
-      role="grid"
-      aria-label="지뢰찾기 판"
-      // 줄 높이를 모두 같게 둔다. 정하지 않으면 줄마다 높이가 달라 첫 줄·마지막 줄이 잘려 보였다
-      style={{ gridTemplateColumns: `repeat(${w}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${h}, minmax(0, 1fr))`, aspectRatio: `${w} / ${h}` }}
-      onContextMenu={(e) => e.preventDefault()}
-    >
+    <div className="mine-wrap">
+    <div className="mine-board" role="grid" aria-label="지뢰찾기 판" style={grid} onContextMenu={(e) => e.preventDefault()}>
       {state.map((s, i) => {
         const cls = ['mcell'];
         let content: string | null = null;
@@ -122,6 +159,7 @@ export function MineBoard({ field, state, cursor, reveal, hint, hintLevel, onPri
           </button>
         );
       })}
+    </div>
     </div>
   );
 }

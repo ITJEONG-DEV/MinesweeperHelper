@@ -793,3 +793,14 @@ a.app-tile:focus-visible {
 .mode-switch.tools {
   grid-template-columns: repeat(3, 1fr);
 }
+
+/* 판 감싸기: 폭을 재고 판을 가운데에 둔다 */
+.mine-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.mine-wrap .mine-board {
+  width: max-content;
+}
