@@ -1,4 +1,4 @@
-import { type CellState, FLAG, HIDDEN, OPEN, neighborsOf } from './board';
+import { type CellState, FLAG, OPEN, isClosed, neighborsOf } from './board';
 
 /** 열린 숫자 칸 하나가 주는 조건: 닫힌 이웃 칸들 중 지뢰가 mines개 */
 export interface Constraint {
@@ -44,7 +44,7 @@ export function constraintsOf(v: View): Constraint[] {
     const cells: number[] = [];
     for (const j of nb[i]) {
       if (v.state[j] === FLAG) flags++;
-      else if (v.state[j] === HIDDEN) cells.push(j);
+      else if (isClosed(v.state[j])) cells.push(j);
     }
     if (!cells.length && flags === v.num[i]) return;
     out.push({ at: i, cells, mines: v.num[i] - flags });
@@ -214,7 +214,7 @@ export function findEnumerate(v: View, cons: Constraint[]): Deduction | null {
   const flags = v.state.filter((s) => s === FLAG).length;
   const remaining = v.total - flags;
   const frontier = new Set(cons.flatMap((c) => c.cells));
-  const interior = v.state.flatMap((s, i) => (s === HIDDEN && !frontier.has(i) ? [i] : []));
+  const interior = v.state.flatMap((s, i) => (isClosed(s) && !frontier.has(i) ? [i] : []));
   // 다 따질 수 없는 묶음이 있으면 남은 지뢰 수는 쓰지 않는다
   const allEnumerated = comps.length === components(cons).length;
   const M = interior.length;

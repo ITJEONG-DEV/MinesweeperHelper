@@ -12,7 +12,12 @@ export interface Field {
 export const HIDDEN = 0;
 export const OPEN = 1;
 export const FLAG = 2;
-export type CellState = typeof HIDDEN | typeof OPEN | typeof FLAG;
+/** 물음표: 사용자가 헷갈리는 칸에 다는 표시. 추론에서는 닫힌 칸과 같다 */
+export const QUESTION = 3;
+export type CellState = typeof HIDDEN | typeof OPEN | typeof FLAG | typeof QUESTION;
+
+/** 닫힌 칸(물음표 포함) */
+export const isClosed = (s: CellState) => s === HIDDEN || s === QUESTION;
 
 const neighborCache = new Map<string, number[][]>();
 
@@ -47,10 +52,10 @@ export function makeField(w: number, h: number, mine: boolean[]): Field {
 
 /**
  * 칸을 연다. 0인 칸이면 주변을 이어서 연다. 새로 연 칸 목록을 돌려준다.
- * 깃발 칸은 열지 않는다.
+ * 깃발 칸은 열지 않는다. 물음표 칸은 닫힌 칸처럼 연다.
  */
 export function openCell(f: Field, state: CellState[], start: number): number[] {
-  if (state[start] !== HIDDEN) return [];
+  if (!isClosed(state[start])) return [];
   const nb = neighborsOf(f.w, f.h);
   const opened: number[] = [];
   const stack = [start];
@@ -60,7 +65,7 @@ export function openCell(f: Field, state: CellState[], start: number): number[] 
     opened.push(i);
     if (f.mine[i] || f.num[i] !== 0) continue;
     for (const j of nb[i]) {
-      if (state[j] !== HIDDEN) continue;
+      if (!isClosed(state[j])) continue;
       state[j] = OPEN;
       stack.push(j);
     }

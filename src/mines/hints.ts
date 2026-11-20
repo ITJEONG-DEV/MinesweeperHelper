@@ -1,4 +1,4 @@
-import { type CellState, FLAG, HIDDEN, type Field, cellName, neighborsOf, openCell } from './board';
+import { type CellState, FLAG, HIDDEN, type Field, cellName, isClosed, neighborsOf, openCell } from './board';
 import { type Deduction, brokenConstraint, constraintsOf, nextDeduction } from './logic';
 
 export type HintKind = 'wrong-flag' | 'broken' | Deduction['kind'] | 'reveal';
@@ -48,7 +48,7 @@ function fromDeduction(input: HintInput, d: Deduction): Hint {
   const { field: f, state } = input;
   const nb = neighborsOf(f.w, f.h);
   const flagsAround = (i: number) => nb[i].filter((j) => state[j] === FLAG).length;
-  const hiddenAround = (i: number) => nb[i].filter((j) => state[j] === HIDDEN).length;
+  const hiddenAround = (i: number) => nb[i].filter((j) => isClosed(state[j])).length;
   const result = [d.safe.length ? `${cellsText(f.w, d.safe)}: 안전해요. 열어도 돼요` : '', d.mines.length ? `${cellsText(f.w, d.mines)}: 지뢰예요. 깃발을 꽂으세요` : '']
     .filter(Boolean)
     .join(' / ');
@@ -152,7 +152,7 @@ export function findHint(input: HintInput): Hint | null {
   const d = nextDeduction(view, 3);
   if (d) return fromDeduction(input, d);
   // 이 앱의 기법으로 더 정해지지 않을 때: 안전한 칸 하나를 알려준다
-  const safe = state.findIndex((s, i) => s === HIDDEN && !f.mine[i]);
+  const safe = state.findIndex((s, i) => isClosed(s) && !f.mine[i]);
   if (safe < 0) return null;
   return {
     kind: 'reveal',

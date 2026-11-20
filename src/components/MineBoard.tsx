@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { type CellState, FLAG, OPEN, type Field } from '../mines/board';
+import { type CellState, FLAG, OPEN, QUESTION, type Field } from '../mines/board';
 import type { Hint } from '../mines/hints';
 
 interface Props {
@@ -79,6 +79,10 @@ export function MineBoard({ field, state, cursor, reveal, hint, hintLevel, onPri
           if (reveal && !mine[i]) cls.push('wrong');
           content = '🚩';
           label += '깃발';
+        } else if (s === QUESTION && !(reveal && mine[i])) {
+          cls.push('question');
+          content = '?';
+          label += '물음표';
         } else if (reveal === 'win' && mine[i]) {
           cls.push('flag');
           content = '🚩';

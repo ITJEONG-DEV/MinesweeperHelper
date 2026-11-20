@@ -783,3 +783,13 @@ a.app-tile:focus-visible {
 .update-banner button:disabled {
   opacity: 0.6;
 }
+
+/* 물음표 칸 */
+.mcell.question {
+  color: var(--accent);
+}
+
+/* 판 아래 동작 고르기 (세 가지) */
+.mode-switch.tools {
+  grid-template-columns: repeat(3, 1fr);
+}

@@ -4,7 +4,7 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { SolvedToast } from './components/SolvedToast';
 import { HintPanel } from './components/HintPanel';
 import { MineBoard } from './components/MineBoard';
-import { type CellState, FLAG, HIDDEN, OPEN, type Field, exploded, isCleared, makeField, neighborsOf, openCell } from './mines/board';
+import { type CellState, FLAG, HIDDEN, OPEN, QUESTION, type Field, exploded, isCleared, isClosed, makeField, neighborsOf, openCell } from './mines/board';
 import { applyHint, findHint, type Hint } from './mines/hints';
 import { LEVELS, SIZES, generate, levelLabel, sizeOf, type Generated, type Level, type SizeId } from './mines/generate';
 
@@ -23,7 +23,13 @@ interface Pick {
   level: Level;
 }
 
-type Tool = 'open' | 'flag';
+/** 칸을 눌렀을 때 동작: 열기 · 깃발 · 물음표 */
+type Tool = 'open' | 'flag' | 'question';
+const TOOLS: { id: Tool; label: string }[] = [
+  { id: 'open', label: '열기' },
+  { id: 'flag', label: '🚩 깃발' },
+  { id: 'question', label: '? 표시' },
+];
 
 interface State {
   game: Game | null;
@@ -39,6 +45,7 @@ interface State {
 type Action =
   | { type: 'primary'; cell: number }
   | { type: 'secondary'; cell: number }
+  | { type: 'question'; cell: number }
   | { type: 'cursor'; cell: number }
   | { type: 'move'; dr: number; dc: number }
   | { type: 'tool'; tool: Tool }
@@ -74,7 +81,7 @@ function loadState(): State {
     const g = saved.game;
     const valid = g && g.mine?.length === g.w * g.h && g.state?.length === g.mine.length;
     const history = valid && Array.isArray(saved.history) ? saved.history.filter((h) => h?.length === g.mine.length) : [];
-    return { ...base, game: valid ? g : null, history, pick, tool: saved.tool === 'flag' ? 'flag' : 'open' };
+    return { ...base, game: valid ? g : null, history, pick, tool: TOOLS.some((t) => t.id === saved.tool) ? saved.tool! : 'open' };
   } catch {
     return base;
   }
@@ -139,24 +146,34 @@ function reducer(s: State, a: Action): State {
     case 'secondary': {
       if (over) return { ...s, cursor: a.cell };
       const i = a.cell;
-      const wantFlag = (a.type === 'primary') === (s.tool === 'flag');
+      // 누름은 고른 동작, 길게 누름·오른쪽 버튼은 깃발(깃발 모드일 때는 열기)
+      const act: Tool = a.type === 'primary' ? s.tool : s.tool === 'flag' ? 'open' : 'flag';
       const next = g.state.slice();
       if (g.state[i] === OPEN) {
         // 숫자 칸: 주변 깃발이 숫자와 같으면 남은 칸을 한꺼번에 연다
         if (!f.num[i]) return { ...s, cursor: i };
         const nb = neighborsOf(g.w, g.h)[i];
         if (nb.filter((j) => g.state[j] === FLAG).length !== f.num[i]) return { ...s, cursor: i };
-        const hidden = nb.filter((j) => g.state[j] === HIDDEN);
+        const hidden = nb.filter((j) => isClosed(g.state[j]));
         if (!hidden.length) return { ...s, cursor: i };
         for (const j of hidden) openCell(f, next, j);
-      } else if (wantFlag) {
+      } else if (act === 'flag') {
         next[i] = g.state[i] === FLAG ? HIDDEN : FLAG;
+      } else if (act === 'question') {
+        next[i] = g.state[i] === QUESTION ? HIDDEN : QUESTION;
       } else {
         if (g.state[i] === FLAG) return { ...s, cursor: i };
         openCell(f, next, i);
       }
       const ns = { ...withState(s, next), cursor: i };
       return ns;
+    }
+    case 'question': {
+      // 키보드 Q: 고른 동작과 상관없이 닫힌 칸에 ?를 달거나 뗀다
+      if (over || !isClosed(g.state[a.cell])) return s;
+      const next = g.state.slice();
+      next[a.cell] = g.state[a.cell] === QUESTION ? HIDDEN : QUESTION;
+      return { ...withState(s, next), cursor: a.cell };
     }
     case 'hint': {
       if (exploded(f, g.state) >= 0) return s;
@@ -238,8 +255,11 @@ export default function App() {
         e.preventDefault();
       } else if (e.code === 'KeyF' && state.cursor !== null) {
         dispatch({ type: 'secondary', cell: state.cursor });
+      } else if (e.code === 'KeyQ' && state.cursor !== null) {
+        dispatch({ type: 'question', cell: state.cursor });
       } else if (e.code === 'KeyT') {
-        dispatch({ type: 'tool', tool: tool === 'open' ? 'flag' : 'open' });
+        const k = TOOLS.findIndex((x) => x.id === tool);
+        dispatch({ type: 'tool', tool: TOOLS[(k + 1) % TOOLS.length].id });
       } else if (e.code === 'KeyH') {
         dispatch({ type: 'hint' });
       }
@@ -305,14 +325,6 @@ export default function App() {
             <span>
               남은 지뢰 <strong>{cleared ? 0 : game.total - flags}</strong>
             </span>
-            <div className="mode-switch compact" role="radiogroup" aria-label="누를 때 동작">
-              <button type="button" role="radio" aria-checked={tool === 'open'} className={tool === 'open' ? 'on' : ''} onClick={() => dispatch({ type: 'tool', tool: 'open' })}>
-                열기
-              </button>
-              <button type="button" role="radio" aria-checked={tool === 'flag'} className={tool === 'flag' ? 'on' : ''} onClick={() => dispatch({ type: 'tool', tool: 'flag' })}>
-                🚩 깃발
-              </button>
-            </div>
           </div>
 
           <div className="board-wrap">
@@ -340,6 +352,15 @@ export default function App() {
             />
           )}
 
+          {/* 다른 퍼즐 도우미처럼 판 아래에서 누를 때 동작을 고른다 */}
+          <div className="mode-switch tools" role="radiogroup" aria-label="누를 때 동작">
+            {TOOLS.map((t) => (
+              <button key={t.id} type="button" role="radio" aria-checked={tool === t.id} className={tool === t.id ? 'on' : ''} onClick={() => dispatch({ type: 'tool', tool: t.id })}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
           <div className="toolbar">
             <button type="button" onClick={() => dispatch({ type: 'undo' })} disabled={!state.history.length}>
               실행 취소
@@ -364,7 +385,7 @@ export default function App() {
             </div>
           </div>
 
-          <p className="keys">키보드: 방향키 이동 · Space/Enter 누르기 · F 깃발 · T 열기/깃발 전환 · H 힌트 · Ctrl+Z 실행 취소 · 마우스 오른쪽 버튼은 깃발</p>
+          <p className="keys">키보드: 방향키 이동 · Space/Enter 누르기 · F 깃발 · Q ? 표시 · T 열기/깃발/? 전환 · H 힌트 · Ctrl+Z 실행 취소 · 마우스 오른쪽 버튼은 깃발</p>
         </>
       )}
     </div>
