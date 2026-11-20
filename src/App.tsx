@@ -350,16 +350,16 @@ export default function App() {
           </div>
 
           <p className="help">
-            {tool === 'open' ? '누르면 열고, 길게 누르면 깃발' : '누르면 깃발, 길게 누르면 열기'}이에요. 숫자를 누르면 주변 깃발이 숫자와 같을 때 남은 칸을 한꺼번에 열어요.
+            {tool === 'open' ? '눌러서 열기, 길게 눌러서 깃발.' : tool === 'flag' ? '눌러서 깃발, 길게 눌러서 열기.' : '눌러서 ? 표시, 길게 눌러서 깃발.'} 주변의 지뢰를 모두 찾은 숫자를 다시 탭할 경우, 남은 칸을 한번에 열어요.
           </p>
 
           <div className="footer-row">
             <div className="footer-actions">
               <button type="button" className="link" onClick={() => dispatch({ type: 'quit' })}>
-                새 판 고르기
+                새 게임
               </button>
               <button type="button" className="link" onClick={() => startRandom(game.size, game.level)} disabled={generating}>
-                {generating ? '만드는 중…' : '같은 조건으로 한 판 더'}
+                {generating ? '만드는 중…' : '같은 조건으로 다시'}
               </button>
             </div>
           </div>
