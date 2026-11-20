@@ -55,7 +55,8 @@ export function MineBoard({ field, state, cursor, reveal, hint, hintLevel, onPri
       className="mine-board"
       role="grid"
       aria-label="지뢰찾기 판"
-      style={{ gridTemplateColumns: `repeat(${w}, minmax(0, 1fr))`, aspectRatio: `${w} / ${h}` }}
+      // 줄 높이를 모두 같게 둔다. 정하지 않으면 줄마다 높이가 달라 첫 줄·마지막 줄이 잘려 보였다
+      style={{ gridTemplateColumns: `repeat(${w}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${h}, minmax(0, 1fr))`, aspectRatio: `${w} / ${h}` }}
       onContextMenu={(e) => e.preventDefault()}
     >
       {state.map((s, i) => {
